@@ -89,16 +89,6 @@ namespace StoreManager.Services
         }
 
         private bool _isLoaded = false;
-
-
-        private async Task SaveTolocalStorageAsync()
-        {
-            if (!_isLoaded)
-                return;
-
-            var json = System.Text.Json.JsonSerializer.Serialize(_chains);
-            await _jsRuntime.InvokeVoidAsync("localStorage.setItem", LocalStorageKey, json);
-        }
     }
 }
 
