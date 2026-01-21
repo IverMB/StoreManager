@@ -1,0 +1,41 @@
+@page "/"
+@using StoreManager.Services
+@inject AuthService authService
+@inject NavigationManager navManager
+
+<div class="login-page">
+    <img src="images/logo.svg" alt="Logo" class="login-logo"/>
+    <div class="login-card">
+        <h2>Store Manager Login</h2>
+
+        <input placeholder="Email" @bind="email" />
+        <input placeholder="Password" type="password" @bind="password" />
+        <button @onclick="HandleLogin">Log ind</button>
+
+        @if (!string.IsNullOrEmpty(errorMessage))
+        {
+            <div style="color:red; margin-top: 0.5rem;">@errorMessage</div>
+        }
+    </div>
+    <a class="help-btn" href="mailto:OptikIt@support.com" target="_blank"> Kan du ikke logge ind? kontakt os her! </a>
+</div>
+
+@code {
+    private string email = "";
+    private string password = "";
+    private string? errorMessage;
+
+    private async Task HandleLogin()
+    {
+        bool success = await authService.LoginAsync(email, password);
+        if (success)
+        {
+            errorMessage = null;
+            navManager.NavigateTo("/administrer");
+        }
+        else
+        {
+            errorMessage = "Forkert email eller password";
+        }
+    }
+}

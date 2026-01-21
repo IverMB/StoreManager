@@ -1,0 +1,485 @@
+@page "/administrer"
+@using StoreManager.Models
+@using StoreManager.Services
+@using System.Data.Common
+@inject UserService userService
+@inject ChainService chainService
+@inject StoreService storeService
+@inject AuthService authService
+@inject NavigationManager navManager
+
+
+<div class="administrer-page">
+
+    <img src="images/logo.svg" alt="logo" class="login-logo" />
+
+
+    <div class="admin-header">
+        @if (authService.IsLoggedIn)
+        {
+            <div class="login-info">
+                <p>Logget ind som: <strong>@authService.CurrentUser?.Email</strong></p>
+                <button class="logout-button" @onclick="Logout">Log ud</button>
+            </div>
+        }
+    </div>
+
+    <!-- KÆDER -->
+    @if (authService.IsAdmin)
+    {
+        <div class="admin-card">
+            <h1>Kæder</h1>
+
+            <input @bind="newChain.Name" placeholder="Kædenavn" />
+
+            @if (!string.IsNullOrEmpty(errorMessage))
+            {
+                <div style="color:red">@errorMessage</div>
+            }
+
+            <button @onclick="AddChain">Tilføj kæde</button>
+
+            <ul>
+                @foreach (var chain in chains)
+                {
+                    <li>
+                        @if (editingChain != null && editingChain.Id == chain.Id)
+                        {
+                            <strong>Nyt kædenavn:</strong>
+                            <input @bind="editingChain.Name" />
+                            <button @onclick="SaveEdit">Gem</button>
+                            <button @onclick="CancelEdit">Annuller</button>
+                        }
+                        else
+                        {
+                            <div>
+                                <strong>@chain.Name</strong><br />
+                                <strong>Id:</strong> @chain.Id<br />
+                                <strong>Oprettet:</strong> @chain.CreatedOn<br />
+                                <strong>Ændret:</strong> @chain.ModifiedOn<br />
+
+                                <button @onclick="() => StartEdit(chain)">Rediger</button>
+                                <button @onclick="() => DeleteChain(chain.Id)">Slet</button>
+                            </div>
+                        }
+                    </li>
+                }
+            </ul>
+        </div>
+    }
+
+    <!-- BUTIKKER -->
+    <div class="admin-card">
+        <h1>Butikker</h1>
+
+        <input @bind="newStore.Storenumber" placeholder="Butiksnummer" type="number" min="0" />
+        <input @bind="newStore.Name" placeholder="Butiksnavn" />
+        <input @bind="newStore.Address" placeholder="Adresse" />
+        <input @bind="newStore.PostalCode" placeholder="Postnummer" type="number" min="0" />
+        <input @bind="newStore.City" placeholder="By" />
+        <input @bind="newStore.PhoneNumber" placeholder="Telefon" type="number" min="0" />
+        <input @bind="newStore.Email" placeholder="Email" />
+        <input @bind="newStore.StoreOwner" placeholder="Butiksejer" />
+
+        <select @bind="newStore.ChainId">
+            <option value="">Ingen kæde</option>
+            @foreach (var chain in chains)
+            {
+                <option value="@chain.Id">@chain.Name</option>
+            }
+        </select>
+
+        <button @onclick="AddStore">Tilføj butik</button>
+
+        @if (!string.IsNullOrEmpty(errorMessage))
+            {
+                <div style="color:red">@errorMessage</div>
+            }
+
+        <ul>
+            @foreach (var store in stores)
+            {
+                <li>
+                    @if (editingStore != null && editingStore.Id == store.Id)
+                    {
+                        <strong>Butiksnummer:</strong>
+                        <input @bind="editingStore.Storenumber" />
+                        <strong>Butiksnavn:</strong>
+                        <input @bind="editingStore.Name" />
+                        <strong>Adresse:</strong>
+                        <input @bind="editingStore.Address" />
+                        <strong>Postnummer:</strong>
+                        <input @bind="editingStore.PostalCode" />
+                        <strong>By:</strong>
+                        <input @bind="editingStore.City" />
+                        <strong>Telefon:</strong>
+                        <input @bind="editingStore.PhoneNumber" />
+                        <strong>Email:</strong>
+                        <input @bind="editingStore.Email" />
+                        <strong>Butiksejer</strong>
+                        <input @bind="editingStore.StoreOwner" />
+                        <strong>Kæde:</strong>
+                        <select @bind="editingStore.ChainId">
+                            <option value="">Ingen kæde</option>
+                            @foreach (var chain in chains)
+                            {
+                                <option value="@chain.Id">@chain.Name</option>
+                            }
+                        </select>
+
+                        <button @onclick="SaveEditStore">Gem</button>
+                        <button @onclick="CancelEditStore">Annuller</button>
+                    }
+                    else
+                    {
+                        <div>
+                            <strong>Butiksnummer:</strong> @store.Storenumber<br />
+                            <strong>Butiksnavn:</strong>@store.Name<br />
+                            <strong>Kæde: </strong> @(store.ChainId != null ? chains.FirstOrDefault(c => c.Id == store.ChainId)?.Name : "Ingen")<br />
+                            <strong>Adresse</strong>@store.Address, @store.PostalCode @store.City<br />
+                            <strong>Tlf:</strong> @store.PhoneNumber<br />
+                            <strong>Email:</strong> @store.Email<br />
+                            <strong>Oprettet</strong> @store.CreatedOn<br />
+
+                            <button @onclick="() => StartEdit(store)">Rediger</button>
+                            <button @onclick="() => deleteStore(store.Id)">Slet</button>
+                        </div>
+                    }
+                </li>
+            }
+        </ul>
+    </div>
+
+    <!-- BRUGERE -->
+    @if (authService.IsAdmin)
+    {
+        <div class="admin-card">
+            <h1>Brugere</h1>
+
+            <div class="create-user">
+                <input placeholder="Navn" @bind="newUserName" />
+                <input placeholder="Email" @bind="newUserEmail" />
+                <input placeholder="Password" type="password" @bind="newUserPassword" />
+
+                <select @bind="newUserRole">
+                    <option value="@Roles.Support">Support</option>
+                    <option value="@Roles.Administrator">Administrator</option>
+                </select>
+
+                <button @onclick="CreateUser">Opret bruger</button>
+            </div>
+
+            @if (!string.IsNullOrEmpty(errorMessage))
+            {
+                <div style="color:red; margin-top: 0.5rem;">@errorMessage</div>
+            }
+
+
+            <ul class="user-list">
+                @foreach (var user in Users)
+                {
+                    <li class="user-card">
+                        @if (editingUser != null && editingUser.Email == user.Email && user.Email != "admin")
+                        {
+                            <strong>Navn</strong>
+                            <input @bind="editingUser.Name" />
+
+                            <strong>Email</strong>
+                            <input @bind="editingUser.Email" readonly />
+
+                            <strong>Password</strong>
+                            <input type="password" @bind="editingUser.Password" />
+
+                            <label>Rolle</label>
+                            <select @bind="editingUser.Role">
+                                <option value="@Roles.Support">Support</option>
+                                <option value="@Roles.Administrator">Administrator</option>
+                            </select>
+
+                            <button @onclick="SaveEditUser">Gem</button>
+                            <button @onclick="CancelEditUser">Annuller</button>
+                        }
+                        else
+                        {
+                            <strong>Navn:</strong>@user.Name<br />
+                            <strong>Email:</strong> @user.Email<br />
+                            <strong>Rolle:</strong> @user.Role<br />
+                            <strong>Oprettet:</strong> @user.CreatedOn<br />
+
+                            @if (user.Email != "admin")
+                            {
+                                <button @onclick="() => StartEdit(user)">Rediger</button>
+                                <button @onclick="() => DeleteUser(user.Email)">Slet</button>
+                            }
+                        }
+                    </li>
+                }
+            </ul>
+        </div>
+    }
+
+</div>
+
+
+
+
+
+
+@code {
+    private Chain newChain = new();
+    private List<Chain> chains = new();
+    private Chain? editingChain = null;
+    private Store? editingStore = null;
+    private User? editingUser = null;
+    private string? errorMessage;
+    private string newUserEmail = "";
+    private string newUserPassword = "";
+    private string newUserName = "";
+    private string newUserRole = Roles.User;
+    private List<User> Users = new();
+
+
+      private async Task AddChain()
+    {
+        if (string.IsNullOrWhiteSpace(newChain.Name))
+            return;
+
+        try
+        {
+            await chainService.AddChainAsync(newChain);
+            newChain = new Chain(); 
+            chains = await chainService.GetAllChainsAsync();
+            errorMessage = null; 
+        }
+        catch (InvalidOperationException ex)
+        {
+            errorMessage = ex.Message;
+        }
+    }
+
+    private async Task DeleteChain(Guid id)
+    {
+        try
+        {
+            await chainService.DeleteChainAsync(id);
+            chains = await chainService.GetAllChainsAsync();
+            errorMessage = null;
+        }
+        catch (InvalidOperationException ex)
+        {
+            errorMessage = ex.Message;
+        }
+    }
+
+    private async Task deleteStore(Guid id)
+    {
+        try
+        {
+            await storeService.DeleteStoreAsync(id);
+            stores = await storeService.GetAllStoresAsync();
+            errorMessage = null;
+        }
+        catch (InvalidOperationException ex)
+        {
+            errorMessage = ex.Message;
+        }
+    }
+
+    private void StartEdit(Chain chain)
+    {
+        editingChain = new Chain
+        {
+            Id = chain.Id,
+            Name = chain.Name,
+            ModifiedOn = chain.ModifiedOn
+        };
+    }
+
+    private void StartEdit(Store store)
+    {
+        editingStore = new Store
+        {
+            Id = store.Id,
+            Storenumber = store.Storenumber,
+            Name = store.Name,
+            Address = store.Address,
+            PostalCode = store.PostalCode,
+            City = store.City,
+            PhoneNumber = store.PhoneNumber,
+            Email = store.Email,
+            StoreOwner = store.StoreOwner,
+            ChainId = store.ChainId,
+            ModifiedOn = store.ModifiedOn
+        };
+    }
+
+    private void StartEdit(User user)
+    {
+        editingUser = new User
+        {
+            Email = user.Email,
+            Name = user.Name,
+            Role = user.Role
+        };
+    }
+
+    private async Task SaveEdit()
+    {
+        if (editingChain == null)
+            return;
+
+        try
+        {
+            await chainService.UpdateChainAsync(editingChain);
+            editingChain = null;
+            chains = await chainService.GetAllChainsAsync();
+            errorMessage = null;
+        }
+        catch (InvalidOperationException ex)
+        {
+            errorMessage = ex.Message;
+        }
+    }
+
+    private async Task SaveEditStore()
+    {
+        if (editingStore == null)
+            return;
+
+        try
+        {
+            await storeService.UpdateStoreAsync(editingStore);
+            editingStore = null;
+            stores = await storeService.GetAllStoresAsync();
+            errorMessage = null;
+        }
+        catch (InvalidOperationException ex)
+        {
+            errorMessage = ex.Message;
+        }
+    }
+
+    private async Task SaveEditUser()
+    {
+        if (editingUser == null)
+            return;
+
+        try
+        {
+            await userService.UpdateUserAsync(editingUser);
+            editingUser = null;
+            Users = await userService.GetAllUsersAsync();
+            errorMessage = null;
+        }
+        catch (InvalidOperationException ex)
+        {
+            errorMessage = ex.Message;
+        }
+    }
+
+    private void CancelEditUser()
+    {
+        editingUser = null;
+    }
+
+    private void CancelEditStore()
+    {
+        editingStore = null;
+    }
+
+    private void Logout()
+    {
+        authService.Logout();
+        navManager.NavigateTo("/");
+    }
+
+    private void CancelEdit()
+    {
+        editingChain = null;
+    }
+
+    private Store newStore = new();
+    private List<Store> stores = new();
+    private async Task AddStore()
+    {
+        try
+        {
+            await storeService.AddStoreAsync(newStore);
+            newStore = new Store();
+            stores = await storeService.GetAllStoresAsync();
+            errorMessage = null;
+        }
+        catch (InvalidOperationException ex)
+        {
+            errorMessage = ex.Message;
+        }
+        
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!authService.IsLoggedIn)
+        {
+            navManager.NavigateTo("/");
+        }
+
+        chains = await chainService.GetAllChainsAsync();
+        stores = await storeService.GetAllStoresAsync();
+        Users = await userService.GetAllUsersAsync();
+    }
+
+
+
+private async Task LoadUsers()
+{
+    Users = await userService.GetAllUsersAsync();
+}
+
+private async Task CreateUser()
+{
+    if (string.IsNullOrWhiteSpace(newUserEmail) || string.IsNullOrWhiteSpace(newUserPassword))
+    {
+        errorMessage = "Email og password skal udfyldes";
+        return;
+    }
+
+    try
+    {
+        var user = new User
+        {
+            Name = newUserName,
+            Email = newUserEmail,
+            Password = newUserPassword,
+            Role = newUserRole
+        };
+
+        await userService.AddUserAsync(user);
+
+        newUserName = "";
+        newUserEmail = "";
+        newUserPassword = "";
+        newUserRole = Roles.User;
+        errorMessage = null;
+
+        await LoadUsers();
+    }
+    catch (InvalidOperationException ex)
+    {
+        errorMessage = ex.Message;
+    }
+}
+
+private async Task DeleteUser(string email)
+{
+    try
+    {
+        await userService.DeleteUserAsync(email);
+        await LoadUsers();
+        errorMessage = null;
+    }
+    catch (InvalidOperationException ex)
+    {
+        errorMessage = ex.Message;
+    }
+}
+}
